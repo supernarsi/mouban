@@ -9,23 +9,33 @@ import (
 
 func CountSong() int64 {
 	var count int64
-	common.Db.Model(&model.Song{}).Count(&count)
+	result := common.Db.Model(&model.Song{}).Count(&count)
+	if result.Error != nil {
+		logrus.Errorln("count song error:", result.Error)
+		return 0
+	}
 	return count
 }
 
 func UpsertSong(song *model.Song) {
 	logrus.WithField("upsert", "song").Infoln("upsert song", song.DoubanId, song.Title)
 	data := &model.Song{}
-	common.Db.Where("douban_id = ? ", song.DoubanId).Assign(song).FirstOrCreate(data)
+	result := common.Db.Where("douban_id = ?", song.DoubanId).Assign(song).FirstOrCreate(data)
+	if result.Error != nil {
+		logrus.Errorln("upsert song error:", result.Error, "douban_id:", song.DoubanId)
+	}
 }
 
 func UpdateSongThumbnail(doubanId uint64, thumbnail string) {
-	common.Db.Model(&model.Song{}).Where("douban_id = ?", doubanId).Update("thumbnail", thumbnail)
+	result := common.Db.Model(&model.Song{}).Where("douban_id = ?", doubanId).Update("thumbnail", thumbnail)
+	if result.Error != nil {
+		logrus.Errorln("update song thumbnail error:", result.Error, "douban_id:", doubanId)
+	}
 }
 
 func CreateSongNx(song *model.Song) bool {
 	data := &model.Song{}
-	inserted := common.Db.Where("douban_id = ? ", song.DoubanId).Attrs(song).FirstOrCreate(data).RowsAffected > 0
+	inserted := common.Db.Where("douban_id = ?", song.DoubanId).Attrs(song).FirstOrCreate(data).RowsAffected > 0
 	if inserted {
 		logrus.Infoln("create song", song.DoubanId, song.Title)
 	}
@@ -34,7 +44,11 @@ func CreateSongNx(song *model.Song) bool {
 
 func GetSongDetail(doubanId uint64) *model.Song {
 	song := &model.Song{}
-	common.Db.Where("douban_id = ? ", doubanId).Find(song)
+	result := common.Db.Where("douban_id = ?", doubanId).Find(song)
+	if result.Error != nil {
+		logrus.Errorln("get song detail error:", result.Error, "douban_id:", doubanId)
+		return nil
+	}
 	if song.ID == 0 {
 		return nil
 	}
@@ -43,6 +57,10 @@ func GetSongDetail(doubanId uint64) *model.Song {
 
 func ListSongBrief(doubanIds *[]uint64) *[]model.Song {
 	var songs *[]model.Song
-	common.Db.Omit("intro", "track_list").Where("douban_id IN ? ", *doubanIds).Find(&songs)
+	result := common.Db.Omit("intro", "track_list").Where("douban_id IN ?", *doubanIds).Find(&songs)
+	if result.Error != nil {
+		logrus.Errorln("list song brief error:", result.Error)
+		return nil
+	}
 	return songs
 }

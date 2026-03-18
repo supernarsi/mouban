@@ -12,14 +12,12 @@ import (
 	"github.com/spf13/viper"
 )
 
-func userSelector(ch chan *model.Schedule, done chan bool) {
+func userSelector(ch chan *model.Schedule) {
 	defer func() {
 		if r := recover(); r != nil {
 			logrus.Errorln("user selector panic", r, util.GetCurrentGoroutineStack())
 		}
 	}()
-
-	<-done
 
 	for {
 		pendingSchedule := dao.SearchScheduleByStatus(consts.TypeUser.Code, consts.ScheduleToCrawl.Code)
@@ -28,7 +26,7 @@ func userSelector(ch chan *model.Schedule, done chan bool) {
 			changed := dao.CasScheduleStatus(pendingSchedule.DoubanId, consts.TypeUser.Code, consts.ScheduleCrawling.Code, *pendingSchedule.Status)
 			if changed {
 				ch <- pendingSchedule
-				return
+				continue
 			}
 		}
 
@@ -39,7 +37,7 @@ func userSelector(ch chan *model.Schedule, done chan bool) {
 			changed := dao.CasScheduleStatus(retrySchedule.DoubanId, consts.TypeUser.Code, consts.ScheduleCrawling.Code, *retrySchedule.Status)
 			if changed {
 				ch <- retrySchedule
-				return
+				continue
 			}
 		}
 
@@ -50,7 +48,7 @@ func userSelector(ch chan *model.Schedule, done chan bool) {
 				changed := dao.CasScheduleStatus(discoverSchedule.DoubanId, consts.TypeUser.Code, consts.ScheduleCrawling.Code, *discoverSchedule.Status)
 				if changed {
 					ch <- discoverSchedule
-					return
+					continue
 				}
 			}
 		}
@@ -59,21 +57,20 @@ func userSelector(ch chan *model.Schedule, done chan bool) {
 	}
 }
 
-func userWorker(index int, ch chan *model.Schedule, done chan bool) {
+func userWorker(index int, ch chan *model.Schedule) {
 	defer func() {
 		if r := recover(); r != nil {
 			logrus.Errorln("user worker panic", r, "user worker (", index, ") crashed  => ", util.GetCurrentGoroutineStack())
 		}
-		done <- true
 	}()
 
-	schedule := <-ch
-
-	t := consts.ParseType(schedule.Type)
-	logrus.Infoln("user thread", index, "start", strconv.FormatUint(schedule.DoubanId, 10))
-	processUser(schedule.DoubanId)
-	dao.CasScheduleStatus(schedule.DoubanId, t.Code, consts.ScheduleCrawled.Code, consts.ScheduleCrawling.Code)
-	logrus.Infoln("user thread", index, "end", strconv.FormatUint(schedule.DoubanId, 10))
+	for schedule := range ch {
+		t := consts.ParseType(schedule.Type)
+		logrus.Infoln("user thread", index, "start", strconv.FormatUint(schedule.DoubanId, 10))
+		processUser(schedule.DoubanId)
+		dao.CasScheduleStatus(schedule.DoubanId, t.Code, consts.ScheduleCrawled.Code, consts.ScheduleCrawling.Code)
+		logrus.Infoln("user thread", index, "end", strconv.FormatUint(schedule.DoubanId, 10))
+	}
 }
 
 func init() {
@@ -85,22 +82,16 @@ func init() {
 	concurrency := viper.GetInt("agent.user.concurrency")
 
 	ch := make(chan *model.Schedule, concurrency)
-	done := make(chan bool, concurrency)
 
 	go func() {
-		for {
-			userSelector(ch, done)
-		}
+		userSelector(ch)
 	}()
 
 	for i := 0; i < concurrency; i++ {
 		j := i + 1
 		go func() {
-			for {
-				userWorker(j, ch, done)
-			}
+			userWorker(j, ch)
 		}()
-		done <- true
 	}
 
 	logrus.Infoln(concurrency, "user agent(s) enabled")

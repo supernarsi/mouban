@@ -16,6 +16,7 @@ import (
 )
 
 var Db *gorm.DB
+var sqlDB *sql.DB
 
 func InitDatabase() {
 	host := viper.GetString("datasource.host")
@@ -36,6 +37,7 @@ func tryCreateDB(username string, password string, host string, port string, dat
 
 	db, err := sql.Open("mysql", sqlStr)
 	if err != nil {
+		logrus.Errorln("open database failed:", err)
 		panic(err)
 	}
 	defer func(db *sql.DB) {
@@ -47,6 +49,7 @@ func tryCreateDB(username string, password string, host string, port string, dat
 
 	_, err = db.Exec(fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s ;", database))
 	if err != nil {
+		logrus.Errorln("create database failed:", err)
 		panic(err)
 	}
 }
@@ -72,7 +75,7 @@ func getConnection(username string, password string, host string, port string, d
 		},
 	)
 
-	db, err := gorm.Open(mysql.Open(sqlStr), &gorm.Config{
+	gormDB, err := gorm.Open(mysql.Open(sqlStr), &gorm.Config{
 		Logger: dbLogger,
 	})
 
@@ -80,8 +83,21 @@ func getConnection(username string, password string, host string, port string, d
 		logrus.Infoln("Open database failed", err)
 		panic("Open database failed " + err.Error())
 	}
-	Db = db
-	logrus.Infoln("mysql connect success")
+	Db = gormDB
+
+	// 获取底层 sql.DB 并配置连接池
+	sqlDB, err = gormDB.DB()
+	if err != nil {
+		logrus.Infoln("Get underlying DB failed", err)
+		panic("Get underlying DB failed " + err.Error())
+	}
+
+	// 配置连接池参数
+	sqlDB.SetMaxIdleConns(10)              // 最大空闲连接数
+	sqlDB.SetMaxOpenConns(100)             // 最大打开连接数
+	sqlDB.SetConnMaxLifetime(time.Hour)    // 连接最长生命周期
+
+	logrus.Infoln("mysql connect success, connection pool configured")
 }
 
 func migrateTables() {

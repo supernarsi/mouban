@@ -12,14 +12,12 @@ import (
 	"github.com/spf13/viper"
 )
 
-func itemSelector(ch chan *model.Schedule, done chan bool) {
+func itemSelector(ch chan *model.Schedule) {
 	defer func() {
 		if r := recover(); r != nil {
 			logrus.Errorln("item selector panic", r, util.GetCurrentGoroutineStack())
 		}
 	}()
-
-	<-done
 
 	types := []consts.Type{consts.TypeBook, consts.TypeMovie, consts.TypeGame, consts.TypeSong}
 	for {
@@ -31,7 +29,7 @@ func itemSelector(ch chan *model.Schedule, done chan bool) {
 				changed := dao.CasScheduleStatus(pendingSchedule.DoubanId, t.Code, consts.ScheduleCrawling.Code, *pendingSchedule.Status)
 				if changed {
 					ch <- pendingSchedule
-					return
+					continue
 				}
 			}
 
@@ -41,7 +39,7 @@ func itemSelector(ch chan *model.Schedule, done chan bool) {
 				changed := dao.CasScheduleStatus(retrySchedule.DoubanId, t.Code, consts.ScheduleCrawling.Code, *retrySchedule.Status)
 				if changed {
 					ch <- retrySchedule
-					return
+					continue
 				}
 			}
 
@@ -51,7 +49,7 @@ func itemSelector(ch chan *model.Schedule, done chan bool) {
 				changed := dao.CasScheduleStatus(discoverSchedule.DoubanId, t.Code, consts.ScheduleCrawling.Code, *discoverSchedule.Status)
 				if changed {
 					ch <- discoverSchedule
-					return
+					continue
 				}
 			}
 		}
@@ -59,21 +57,20 @@ func itemSelector(ch chan *model.Schedule, done chan bool) {
 	}
 }
 
-func itemWorker(index int, ch chan *model.Schedule, done chan bool) {
+func itemWorker(index int, ch chan *model.Schedule) {
 	defer func() {
 		if r := recover(); r != nil {
 			logrus.Errorln("item worker panic", r, "item worker (", index, ") crashed  => ", util.GetCurrentGoroutineStack())
 		}
-		done <- true
 	}()
 
-	schedule := <-ch
-
-	t := consts.ParseType(schedule.Type)
-	logrus.Infoln("item thread", index, "start", t.Name, strconv.FormatUint(schedule.DoubanId, 10))
-	processItem(schedule.Type, schedule.DoubanId)
-	dao.CasScheduleStatus(schedule.DoubanId, t.Code, consts.ScheduleCrawled.Code, consts.ScheduleCrawling.Code)
-	logrus.Infoln("item thread", index, "end", t.Name, strconv.FormatUint(schedule.DoubanId, 10))
+	for schedule := range ch {
+		t := consts.ParseType(schedule.Type)
+		logrus.Infoln("item thread", index, "start", t.Name, strconv.FormatUint(schedule.DoubanId, 10))
+		processItem(schedule.Type, schedule.DoubanId)
+		dao.CasScheduleStatus(schedule.DoubanId, t.Code, consts.ScheduleCrawled.Code, consts.ScheduleCrawling.Code)
+		logrus.Infoln("item thread", index, "end", t.Name, strconv.FormatUint(schedule.DoubanId, 10))
+	}
 }
 
 func init() {
@@ -85,22 +82,16 @@ func init() {
 	concurrency := viper.GetInt("agent.item.concurrency")
 
 	ch := make(chan *model.Schedule, concurrency)
-	done := make(chan bool, concurrency)
 
 	go func() {
-		for {
-			itemSelector(ch, done)
-		}
+		itemSelector(ch)
 	}()
 
 	for i := 0; i < concurrency; i++ {
 		j := i + 1
 		go func() {
-			for {
-				itemWorker(j, ch, done)
-			}
+			itemWorker(j, ch)
 		}()
-		done <- true
 	}
 
 	logrus.Infoln(concurrency, "item agent(s) enabled")

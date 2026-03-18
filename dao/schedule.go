@@ -8,6 +8,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -19,7 +20,11 @@ var (
 
 func GetSchedule(doubanId uint64, t uint8) *model.Schedule {
 	schedule := &model.Schedule{}
-	common.Db.Where("douban_id = ? AND type = ? ", doubanId, t).Find(schedule)
+	result := common.Db.Where("douban_id = ? AND type = ?", doubanId, t).Find(schedule)
+	if result.Error != nil {
+		logrus.Errorln("get schedule error:", result.Error, "douban_id:", doubanId, "type:", t)
+		return nil
+	}
 	if schedule.ID == 0 {
 		return nil
 	}
@@ -29,10 +34,14 @@ func GetSchedule(doubanId uint64, t uint8) *model.Schedule {
 // SearchScheduleByStatus idx_status
 func SearchScheduleByStatus(t uint8, status uint8) *model.Schedule {
 	schedule := &model.Schedule{}
-	common.Db.Where("type = ? AND status = ? ", t, status).
+	result := common.Db.Where("type = ? AND status = ?", t, status).
 		Order("updated_at asc").
 		Limit(1).
 		Find(&schedule)
+	if result.Error != nil {
+		logrus.Errorln("search schedule by status error:", result.Error, "type:", t, "status:", status)
+		return nil
+	}
 	if schedule.ID == 0 {
 		return nil
 	}
@@ -42,10 +51,14 @@ func SearchScheduleByStatus(t uint8, status uint8) *model.Schedule {
 // SearchScheduleByAll idx_search
 func SearchScheduleByAll(t uint8, status uint8, result uint8) *model.Schedule {
 	schedule := &model.Schedule{}
-	common.Db.Where("type = ? AND `status`= ? AND result = ?", t, status, result).
+	dbResult := common.Db.Where("type = ? AND `status`= ? AND result = ?", t, status, result).
 		Order("updated_at asc").
 		Limit(1).
 		Find(&schedule)
+	if dbResult.Error != nil {
+		logrus.Errorln("search schedule by all error:", dbResult.Error, "type:", t, "status:", status, "result:", result)
+		return nil
+	}
 	if schedule.ID == 0 {
 		return nil
 	}
@@ -54,26 +67,38 @@ func SearchScheduleByAll(t uint8, status uint8, result uint8) *model.Schedule {
 
 // CasOrphanSchedule idx_status
 func CasOrphanSchedule(t uint8, expire time.Duration) int64 {
-	return common.Db.Model(&model.Schedule{}).
+	result := common.Db.Model(&model.Schedule{}).
 		Where("type = ? AND status = ? AND updated_at < ?", t, consts.ScheduleCrawling.Code, time.Now().Add(-expire)).
-		Update("status", consts.ScheduleToCrawl.Code).RowsAffected
+		Update("status", consts.ScheduleToCrawl.Code)
+	if result.Error != nil {
+		logrus.Errorln("cas orphan schedule error:", result.Error, "type:", t)
+		return 0
+	}
+	return result.RowsAffected
 }
 
 // CasScheduleStatus uk_schedule
 func CasScheduleStatus(doubanId uint64, t uint8, status uint8, rawStatus uint8) bool {
-	row := common.Db.Model(&model.Schedule{}).
+	result := common.Db.Model(&model.Schedule{}).
 		Where("douban_id = ? AND type = ? AND status = ?", doubanId, t, rawStatus).
-		Update("status", status).RowsAffected
-	return row > 0
+		Update("status", status)
+	if result.Error != nil {
+		logrus.Errorln("cas schedule status error:", result.Error, "douban_id:", doubanId, "type:", t)
+		return false
+	}
+	return result.RowsAffected > 0
 }
 
 // ChangeScheduleResult uk_schedule
 func ChangeScheduleResult(doubanId uint64, t uint8, result uint8) {
 	dataProcessTotal.WithLabelValues(consts.ParseType(t).Name, consts.ParseResult(result).Name).Inc()
 
-	common.Db.Model(&model.Schedule{}).
+	dbResult := common.Db.Model(&model.Schedule{}).
 		Where("douban_id = ? AND type = ?", doubanId, t).
 		Update("result", result)
+	if dbResult.Error != nil {
+		logrus.Errorln("change schedule result error:", dbResult.Error, "douban_id:", doubanId, "type:", t)
+	}
 }
 
 func CreateScheduleNx(doubanId uint64, t uint8, status uint8, result uint8) bool {
@@ -84,6 +109,10 @@ func CreateScheduleNx(doubanId uint64, t uint8, status uint8, result uint8) bool
 		Status:   &status,
 		Result:   &result,
 	}
-	row := common.Db.Where("douban_id = ? AND type = ? ", doubanId, t).Attrs(insert).FirstOrCreate(data).RowsAffected
-	return row > 0
+	dbResult := common.Db.Where("douban_id = ? AND type = ?", doubanId, t).Attrs(insert).FirstOrCreate(data)
+	if dbResult.Error != nil {
+		logrus.Errorln("create schedule nx error:", dbResult.Error, "douban_id:", doubanId, "type:", t)
+		return false
+	}
+	return dbResult.RowsAffected > 0
 }

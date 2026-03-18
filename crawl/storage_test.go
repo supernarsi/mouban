@@ -1,32 +1,11 @@
 package crawl
 
 import (
-	"os"
 	"testing"
-
-	"github.com/sirupsen/logrus"
 )
 
+// TestStorage 已废弃 - S3 存储功能已移除
+// 现在图片 URL 直接保存豆瓣原始地址，不再进行下载和上传
 func TestStorage(t *testing.T) {
-
-	var file *os.File
-	for i := 0; i < 5; i++ {
-		file = download("https://img2.doubanio.com/view/subject/s/public/s34828161.jpg", "https://www.douban.com/")
-		if file != nil {
-			break
-		}
-	}
-	if file == nil {
-		panic("download file finally failed")
-	}
-
-	mtype, extension := mime(file.Name())
-
-	md5Result := md5sum(file.Name())
-
-	result := upload(file.Name(), md5Result+extension, mtype)
-
-	logrus.Println(result)
-
-	_ = os.Remove(file.Name())
+	t.Skip("S3 storage functionality has been removed")
 }

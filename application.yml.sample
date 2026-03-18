@@ -1,7 +1,12 @@
+# 应用配置示例文件
+# 生产环境建议使用环境变量覆盖敏感配置
+# 环境变量格式：KEY__SUBKEY (如：DATASOURCE__PASSWORD)
+
 server:
   cors: http://localhost
   port: 8080
   limit: 1h
+
 agent:
   enable: false
   flow:
@@ -12,16 +17,18 @@ agent:
     concurrency: 3
     max: 3000
   discover:
-    level: 0 #0-no discover;1-discover by id;2-discover by id and domain
+    level: 0 # 0-no discover; 1-discover by id; 2-discover by id and domain
+
 datasource:
   driver: mysql
   host: localhost
   port: 3306
   database: mouban
-  username: root
-  password: 123456
+  username: ${DB_USERNAME:-root}        # 或使用环境变量 DB_USERNAME
+  password: ${DB_PASSWORD:-changeme}    # 强烈建议使用环境变量设置密码
   charset: utf8mb4
   loc: Asia/Shanghai
+
 http:
   timeout: 10000
   retry_max: 20
@@ -29,10 +36,6 @@ http:
     user: 4000
     item: 4000
     discover: 4000
-  auth: 42342343:rwedsf32,https://user:password@host:port;
-s3:
-  endpoint: https://minio.mythsman.com
-  region: us-east-1
-  bucket: douban
-  access_key: aaa
-  secret_key: bbb
+  # 格式：<dbcl2_cookie>,<proxy_url>; 多个用分号分隔
+  # 示例：http__auth=abc123,http://user:pass@proxy:8080;
+  auth: ${HTTP_AUTH:-}

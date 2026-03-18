@@ -10,12 +10,19 @@ import (
 func UpsertRating(rating *model.Rating) {
 	logrus.Infoln("upsert rating", rating.DoubanId, rating.Type)
 	data := &model.Rating{}
-	common.Db.Where("douban_id = ? AND type = ?", rating.DoubanId, rating.Type).Assign(rating).FirstOrCreate(data)
+	result := common.Db.Where("douban_id = ? AND type = ?", rating.DoubanId, rating.Type).Assign(rating).FirstOrCreate(data)
+	if result.Error != nil {
+		logrus.Errorln("upsert rating error:", result.Error, "douban_id:", rating.DoubanId, "type:", rating.Type)
+	}
 }
 
 func GetRating(doubanId uint64, t uint8) *model.Rating {
 	rating := &model.Rating{}
-	common.Db.Where("douban_id = ? AND type = ?", doubanId, t).Find(rating)
+	result := common.Db.Where("douban_id = ? AND type = ?", doubanId, t).Find(rating)
+	if result.Error != nil {
+		logrus.Errorln("get rating error:", result.Error, "douban_id:", doubanId, "type:", t)
+		return nil
+	}
 	if rating.ID == 0 {
 		return nil
 	}
@@ -24,6 +31,10 @@ func GetRating(doubanId uint64, t uint8) *model.Rating {
 
 func ListRating(doubanIds *[]uint64, t uint8) *[]model.Rating {
 	var rating *[]model.Rating
-	common.Db.Where("douban_id IN ? AND type = ?", *doubanIds, t).Find(&rating)
+	result := common.Db.Where("douban_id IN ? AND type = ?", *doubanIds, t).Find(&rating)
+	if result.Error != nil {
+		logrus.Errorln("list rating error:", result.Error, "type:", t)
+		return nil
+	}
 	return rating
 }

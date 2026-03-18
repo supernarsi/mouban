@@ -42,7 +42,6 @@ func processBook(doubanId uint64) {
 		panic(err)
 	}
 
-	book.Thumbnail = crawl.Storage(book.Thumbnail)
 	dao.UpsertBook(book)
 	dao.UpsertRating(rating)
 
@@ -64,7 +63,6 @@ func processMovie(doubanId uint64) {
 		dao.ChangeScheduleResult(doubanId, consts.TypeMovie.Code, consts.ScheduleInvalid.Code)
 		panic(err)
 	}
-	movie.Thumbnail = crawl.Storage(movie.Thumbnail)
 	dao.UpsertMovie(movie)
 	dao.UpsertRating(rating)
 
@@ -87,7 +85,6 @@ func processGame(doubanId uint64) {
 		dao.ChangeScheduleResult(doubanId, consts.TypeGame.Code, consts.ScheduleInvalid.Code)
 		panic(err)
 	}
-	game.Thumbnail = crawl.Storage(game.Thumbnail)
 	dao.UpsertGame(game)
 	dao.UpsertRating(rating)
 
@@ -110,7 +107,6 @@ func processSong(doubanId uint64) {
 		dao.ChangeScheduleResult(doubanId, consts.TypeSong.Code, consts.ScheduleInvalid.Code)
 		panic(err)
 	}
-	song.Thumbnail = crawl.Storage(song.Thumbnail)
 	dao.UpsertSong(song)
 	dao.UpsertRating(rating)
 
@@ -240,7 +236,6 @@ func processUser(doubanUid uint64) {
 	user.CheckAt = time.Now()
 	user.SyncAt = time.Now()
 
-	user.Thumbnail = crawl.Storage(user.Thumbnail)
 	dao.UpsertUser(user)
 	dao.ChangeScheduleResult(doubanUid, consts.TypeUser.Code, consts.ScheduleReady.Code)
 }
@@ -274,16 +269,9 @@ func syncCommentGame(user *model.User, forceSyncAfter time.Time) {
 			dao.UpsertComment(&(*comment)[i])
 
 			item := &(*game)[i]
-			newThumbnail := crawl.Storage(item.Thumbnail)
-			thumbChange := item.Thumbnail != newThumbnail
-			item.Thumbnail = newThumbnail
 			added := dao.CreateGameNx(item)
 			if added {
 				dao.CreateScheduleNx(item.DoubanId, consts.TypeGame.Code, consts.ScheduleToCrawl.Code, consts.ScheduleUnready.Code)
-			} else {
-				if thumbChange {
-					dao.UpdateGameThumbnail(item.DoubanId, item.Thumbnail)
-				}
 			}
 		}
 	}()
@@ -317,16 +305,9 @@ func syncCommentBook(user *model.User, forceSyncAfter time.Time) {
 			dao.UpsertComment(&(*comment)[i])
 
 			item := &(*book)[i]
-			newThumbnail := crawl.Storage(item.Thumbnail)
-			thumbChange := item.Thumbnail != newThumbnail
-			item.Thumbnail = newThumbnail
 			added := dao.CreateBookNx(item)
 			if added {
 				dao.CreateScheduleNx(item.DoubanId, consts.TypeBook.Code, consts.ScheduleToCrawl.Code, consts.ScheduleUnready.Code)
-			} else {
-				if thumbChange {
-					dao.UpdateBookThumbnail(item.DoubanId, item.Thumbnail)
-				}
 			}
 		}
 	}()
@@ -361,16 +342,9 @@ func syncCommentMovie(user *model.User, forceSyncAfter time.Time) {
 			dao.UpsertComment(&(*comment)[i])
 
 			item := &(*movie)[i]
-			newThumbnail := crawl.Storage(item.Thumbnail)
-			thumbChange := item.Thumbnail != newThumbnail
-			item.Thumbnail = newThumbnail
 			added := dao.CreateMovieNx(item)
 			if added {
 				dao.CreateScheduleNx(item.DoubanId, consts.TypeMovie.Code, consts.ScheduleToCrawl.Code, consts.ScheduleUnready.Code)
-			} else {
-				if thumbChange {
-					dao.UpdateMovieThumbnail(item.DoubanId, item.Thumbnail)
-				}
 			}
 		}
 	}()
@@ -405,16 +379,9 @@ func syncCommentSong(user *model.User, forceSyncAfter time.Time) {
 			item := &(*song)[i]
 			dao.UpsertComment(&(*comment)[i])
 
-			newThumbnail := crawl.Storage(item.Thumbnail)
-			thumbChange := item.Thumbnail != newThumbnail
-			item.Thumbnail = newThumbnail
 			added := dao.CreateSongNx(item)
 			if added {
 				dao.CreateScheduleNx(item.DoubanId, consts.TypeSong.Code, consts.ScheduleToCrawl.Code, consts.ScheduleUnready.Code)
-			} else {
-				if thumbChange {
-					dao.UpdateSongThumbnail(item.DoubanId, item.Thumbnail)
-				}
 			}
 		}
 	}()
