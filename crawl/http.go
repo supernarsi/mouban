@@ -49,7 +49,7 @@ func init() {
 			clients = append(clients, client)
 		}
 	}
-	logrus.Infoln(len(clients), "user auth initialized")
+	logrus.WithField("count", len(clients)).Debugln("user auth clients initialized")
 }
 
 func initClient(dbcl2 string, proxy *url.URL) *retryablehttp.Client {
@@ -70,7 +70,7 @@ func initClient(dbcl2 string, proxy *url.URL) *retryablehttp.Client {
 		Jar: initCookieJar(dbcl2),
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= 5 {
-				logrus.Infoln("too many redirects found for", req.URL.String())
+				logrus.Debugln("too many redirects found for", req.URL.String())
 				return errors.New("too many redirects for " + req.URL.String())
 			}
 			if len(via) > 0 && req.Header.Get("cookie") == "" {
@@ -98,7 +98,7 @@ func initClient(dbcl2 string, proxy *url.URL) *retryablehttp.Client {
 	go func() {
 		for range time.NewTicker(time.Hour * 1).C {
 			retryClient.HTTPClient.Jar = initCookieJar(dbcl2)
-			logrus.Infoln("client cookie jar refreshed")
+			logrus.Debugln("client cookie jar refreshed")
 		}
 	}()
 	return retryClient
@@ -148,7 +148,11 @@ func Get(url string, limiter *rate.Limiter) (*string, int, error) {
 
 	defer func() {
 		duration := time.Since(startTime).Milliseconds()
-		logrus.WithField("code", strconv.Itoa(resp.StatusCode)).Infoln("code is", strconv.Itoa(resp.StatusCode), "in", duration, "ms", "at user", 1+clientIdx, "for", url)
+		logrus.WithFields(logrus.Fields{
+			"code":       strconv.Itoa(resp.StatusCode),
+			"duration_ms": duration,
+			"user_idx":   1 + clientIdx,
+		}).Debugln("HTTP request completed for", url)
 		callOpsHistogram.WithLabelValues(strconv.Itoa(resp.StatusCode), strconv.Itoa(clientIdx)).Observe(float64(duration))
 		resp.Body.Close()
 	}()

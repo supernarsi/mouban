@@ -23,7 +23,7 @@ var (
 		Name:    "mouban_service_ops_duration",
 		Help:    "Histogram of the duration of HTTP service requests",
 		Buckets: prometheus.DefBuckets,
-	}, []string{"method", "path", "ua", "referer"})
+	}, []string{"method", "path"})
 )
 
 func main() {
@@ -52,7 +52,7 @@ func main() {
 		}
 
 		duration := time.Since(start).Seconds()
-		serviceOpsHistogram.WithLabelValues(c.Request.Method, c.Request.URL.Path, c.Request.UserAgent(), referer).Observe(duration)
+		serviceOpsHistogram.WithLabelValues(c.Request.Method, c.Request.URL.Path).Observe(duration)
 
 	})
 
@@ -133,7 +133,6 @@ func logger(c *gin.Context) {
 	latencyTime := endTime.Sub(startTime)
 
 	// 请求路由
-	reqUri := c.Request.RequestURI
 
 	// 状态码
 	statusCode := c.Writer.Status()
@@ -142,5 +141,9 @@ func logger(c *gin.Context) {
 	clientIP := c.ClientIP()
 
 	// 日志格式
-	logrus.Infoln("uri", reqUri, "status_code", statusCode, "cost", latencyTime, "client_ip", clientIP)
+	logrus.WithFields(logrus.Fields{
+		"status":    statusCode,
+		"latency_ms": latencyTime.Milliseconds(),
+		"client_ip": clientIP,
+	}).Debugln("HTTP request")
 }

@@ -22,7 +22,7 @@ func userSelector(ch chan *model.Schedule) {
 	for {
 		pendingSchedule := dao.SearchScheduleByStatus(consts.TypeUser.Code, consts.ScheduleToCrawl.Code)
 		if pendingSchedule != nil {
-			logrus.Infoln("pending user found", pendingSchedule.DoubanId)
+			logrus.WithField("douban_id", pendingSchedule.DoubanId).Debugln("pending user found")
 			changed := dao.CasScheduleStatus(pendingSchedule.DoubanId, consts.TypeUser.Code, consts.ScheduleCrawling.Code, *pendingSchedule.Status)
 			if changed {
 				ch <- pendingSchedule
@@ -33,7 +33,7 @@ func userSelector(ch chan *model.Schedule) {
 		retrySchedule := dao.SearchScheduleByAll(consts.TypeUser.Code, consts.ScheduleCrawled.Code, consts.ScheduleUnready.Code)
 
 		if retrySchedule != nil {
-			logrus.Infoln("retry user found", retrySchedule.DoubanId)
+			logrus.WithField("douban_id", retrySchedule.DoubanId).Debugln("retry user found")
 			changed := dao.CasScheduleStatus(retrySchedule.DoubanId, consts.TypeUser.Code, consts.ScheduleCrawling.Code, *retrySchedule.Status)
 			if changed {
 				ch <- retrySchedule
@@ -44,7 +44,7 @@ func userSelector(ch chan *model.Schedule) {
 		if viper.GetBool("agent.flow.discover") {
 			discoverSchedule := dao.SearchScheduleByStatus(consts.TypeUser.Code, consts.ScheduleCanCrawl.Code)
 			if discoverSchedule != nil {
-				logrus.Infoln("discover user found", discoverSchedule.DoubanId)
+				logrus.WithField("douban_id", discoverSchedule.DoubanId).Debugln("discover user found")
 				changed := dao.CasScheduleStatus(discoverSchedule.DoubanId, consts.TypeUser.Code, consts.ScheduleCrawling.Code, *discoverSchedule.Status)
 				if changed {
 					ch <- discoverSchedule
@@ -66,10 +66,16 @@ func userWorker(index int, ch chan *model.Schedule) {
 
 	for schedule := range ch {
 		t := consts.ParseType(schedule.Type)
-		logrus.Infoln("user thread", index, "start", strconv.FormatUint(schedule.DoubanId, 10))
+		logrus.WithFields(logrus.Fields{
+			"douban_id":  strconv.FormatUint(schedule.DoubanId, 10),
+			"thread_idx": index,
+		}).Infoln("user processing started")
 		processUser(schedule.DoubanId)
 		dao.CasScheduleStatus(schedule.DoubanId, t.Code, consts.ScheduleCrawled.Code, consts.ScheduleCrawling.Code)
-		logrus.Infoln("user thread", index, "end", strconv.FormatUint(schedule.DoubanId, 10))
+		logrus.WithFields(logrus.Fields{
+			"douban_id":  strconv.FormatUint(schedule.DoubanId, 10),
+			"thread_idx": index,
+		}).Infoln("user processing completed")
 	}
 }
 
@@ -94,6 +100,6 @@ func init() {
 		}()
 	}
 
-	logrus.Infoln(concurrency, "user agent(s) enabled")
+	logrus.WithField("concurrency", concurrency).Infoln("user agent(s) enabled")
 
 }

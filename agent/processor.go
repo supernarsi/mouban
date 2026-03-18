@@ -13,6 +13,64 @@ import (
 	"github.com/spf13/viper"
 )
 
+// syncComment 通用函数：同步用户评论和条目数据
+// crawlFn: 爬取评论和条目的函数
+// createItemFn: 创建条目的 DAO 函数（接收指针）
+// createScheduleFn: 创建调度任务的 DAO 函数
+// typeName: 类型名称（用于日志）
+// getDoubanId: 获取条目 ID 的函数
+func syncComment[T any](
+	user *model.User,
+	forceSyncAfter time.Time,
+	crawlFn func(*model.User, time.Time) (*[]model.Comment, *[]T, error),
+	createItemFn func(*T) bool,
+	createScheduleFn func(uint64, uint8, uint8, uint8) bool,
+	typeName string,
+	typeCode uint8,
+	getDoubanId func(*T) uint64,
+) {
+	comment, items, err := crawlFn(user, forceSyncAfter)
+	if err != nil {
+		panic(err)
+	}
+
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logrus.WithFields(logrus.Fields{
+					"type": typeName,
+				}).Errorln("sync comment panic", r, "=>", util.GetCurrentGoroutineStack())
+			}
+		}()
+
+		// 如果是全量同步，隐藏已删除的评论
+		if forceSyncAfter.Unix() == 0 {
+			newCommentIds := make(map[uint64]bool)
+			for i := range *items {
+				newCommentIds[getDoubanId(&(*items)[i])] = true
+			}
+			oldCommentIds := dao.GetCommentIds(user.DoubanUid, typeCode)
+			for i := range *oldCommentIds {
+				id := (*oldCommentIds)[i]
+				if !newCommentIds[id] {
+					dao.HideComment(user.DoubanUid, typeCode, id)
+				}
+			}
+		}
+
+		// 处理每条评论和条目
+		for i := range *items {
+			dao.UpsertComment(&(*comment)[i])
+
+			item := &(*items)[i]
+			added := createItemFn(item)
+			if added {
+				createScheduleFn(getDoubanId(item), typeCode, consts.ScheduleToCrawl.Code, consts.ScheduleUnready.Code)
+			}
+		}
+	}()
+}
+
 func processItem(t uint8, doubanId uint64) {
 	switch t {
 	case consts.TypeBook.Code:
@@ -148,7 +206,10 @@ func processDiscoverUser(newUsers *[]string) {
 			}
 		}
 		if newFound > 0 {
-			logrus.Infoln("(", newFound, "/", totalFound, ") users discovered")
+			logrus.WithFields(logrus.Fields{
+				"new_found":  newFound,
+				"total_found": totalFound,
+			}).Infoln("users discovered")
 		}
 	}()
 }
@@ -176,7 +237,11 @@ func processDiscoverItem(newItems *[]uint64, t consts.Type) {
 			}
 		}
 		if newFound > 0 {
-			logrus.Infoln("(", newFound, "/", totalFound, ")", t.Name, "discovered")
+			logrus.WithFields(logrus.Fields{
+				"new_found":  newFound,
+				"total_found": totalFound,
+				"type":       t.Name,
+			}).Infoln("items discovered")
 		}
 	}()
 }
@@ -191,12 +256,12 @@ func processUser(doubanUid uint64) {
 	userPublish, _ := crawl.UserPublish(doubanUid)
 	rawUser := dao.GetUser(doubanUid)
 	if rawUser != nil && rawUser.PublishAt.Equal(userPublish) {
-		logrus.Infoln("user", doubanUid, "changed ->", false)
+		logrus.WithField("douban_uid", doubanUid).Debugln("user not changed")
 		rawUser.CheckAt = time.Now()
 		dao.UpsertUser(rawUser)
 		return
 	}
-	logrus.Infoln("user", doubanUid, "changed ->", true)
+	logrus.WithField("douban_uid", doubanUid).Infoln("user changed")
 
 	//user
 	user, err := crawl.UserOverview(doubanUid)
@@ -211,7 +276,10 @@ func processUser(doubanUid uint64) {
 		forceSyncAfter = rawUser.SyncAt
 	}
 
-	logrus.Infoln("user", doubanUid, "sync_after ->", forceSyncAfter)
+	logrus.WithFields(logrus.Fields{
+		"douban_uid":   doubanUid,
+		"sync_after":   forceSyncAfter,
+	}).Infoln("user sync timestamp")
 
 	//book
 	if user.BookDo+user.BookWish+user.BookCollect > 0 {
@@ -241,148 +309,53 @@ func processUser(doubanUid uint64) {
 }
 
 func syncCommentGame(user *model.User, forceSyncAfter time.Time) {
-	comment, game, err := crawl.CommentGame(user, forceSyncAfter)
-	if err != nil {
-		panic(err)
-	}
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logrus.Errorln("sync comment game panic", r, "=>", util.GetCurrentGoroutineStack())
-			}
-		}()
-		if forceSyncAfter.Unix() == 0 {
-			newCommentIds := make(map[uint64]bool)
-			for i := range *game {
-				newCommentIds[(*game)[i].DoubanId] = true
-			}
-			oldCommentIds := dao.GetCommentIds(user.DoubanUid, consts.TypeGame.Code)
-			for i := range *oldCommentIds {
-				id := (*oldCommentIds)[i]
-				if !newCommentIds[id] {
-					dao.HideComment(user.DoubanUid, consts.TypeGame.Code, id)
-				}
-			}
-		}
-
-		for i := range *game {
-			dao.UpsertComment(&(*comment)[i])
-
-			item := &(*game)[i]
-			added := dao.CreateGameNx(item)
-			if added {
-				dao.CreateScheduleNx(item.DoubanId, consts.TypeGame.Code, consts.ScheduleToCrawl.Code, consts.ScheduleUnready.Code)
-			}
-		}
-	}()
+	syncComment(
+		user,
+		forceSyncAfter,
+		crawl.CommentGame,
+		dao.CreateGameNx,
+		dao.CreateScheduleNx,
+		"game",
+		consts.TypeGame.Code,
+		func(item *model.Game) uint64 { return item.DoubanId },
+	)
 }
 
 func syncCommentBook(user *model.User, forceSyncAfter time.Time) {
-	comment, book, err := crawl.CommentBook(user, forceSyncAfter)
-	if err != nil {
-		panic(err)
-	}
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logrus.Errorln("sync comment book panic", r, "=>", util.GetCurrentGoroutineStack())
-			}
-		}()
-		if forceSyncAfter.Unix() == 0 {
-			newCommentIds := make(map[uint64]bool)
-			for i := range *book {
-				newCommentIds[(*book)[i].DoubanId] = true
-			}
-			oldCommentIds := dao.GetCommentIds(user.DoubanUid, consts.TypeBook.Code)
-			for i := range *oldCommentIds {
-				id := (*oldCommentIds)[i]
-				if !newCommentIds[id] {
-					dao.HideComment(user.DoubanUid, consts.TypeBook.Code, id)
-				}
-			}
-		}
-		for i := range *book {
-			dao.UpsertComment(&(*comment)[i])
-
-			item := &(*book)[i]
-			added := dao.CreateBookNx(item)
-			if added {
-				dao.CreateScheduleNx(item.DoubanId, consts.TypeBook.Code, consts.ScheduleToCrawl.Code, consts.ScheduleUnready.Code)
-			}
-		}
-	}()
+	syncComment(
+		user,
+		forceSyncAfter,
+		crawl.CommentBook,
+		dao.CreateBookNx,
+		dao.CreateScheduleNx,
+		"book",
+		consts.TypeBook.Code,
+		func(item *model.Book) uint64 { return item.DoubanId },
+	)
 }
 
 func syncCommentMovie(user *model.User, forceSyncAfter time.Time) {
-	comment, movie, err := crawl.CommentMovie(user, forceSyncAfter)
-	if err != nil {
-		panic(err)
-	}
-
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logrus.Errorln("sync comment movie panic", r, "=>", util.GetCurrentGoroutineStack())
-			}
-		}()
-		if forceSyncAfter.Unix() == 0 {
-			newCommentIds := make(map[uint64]bool)
-			for i := range *movie {
-				newCommentIds[(*movie)[i].DoubanId] = true
-			}
-			oldCommentIds := dao.GetCommentIds(user.DoubanUid, consts.TypeMovie.Code)
-			for i := range *oldCommentIds {
-				id := (*oldCommentIds)[i]
-				if !newCommentIds[id] {
-					dao.HideComment(user.DoubanUid, consts.TypeMovie.Code, id)
-				}
-			}
-		}
-		for i := range *movie {
-			dao.UpsertComment(&(*comment)[i])
-
-			item := &(*movie)[i]
-			added := dao.CreateMovieNx(item)
-			if added {
-				dao.CreateScheduleNx(item.DoubanId, consts.TypeMovie.Code, consts.ScheduleToCrawl.Code, consts.ScheduleUnready.Code)
-			}
-		}
-	}()
+	syncComment(
+		user,
+		forceSyncAfter,
+		crawl.CommentMovie,
+		dao.CreateMovieNx,
+		dao.CreateScheduleNx,
+		"movie",
+		consts.TypeMovie.Code,
+		func(item *model.Movie) uint64 { return item.DoubanId },
+	)
 }
 
 func syncCommentSong(user *model.User, forceSyncAfter time.Time) {
-	comment, song, err := crawl.CommentSong(user, forceSyncAfter)
-	if err != nil {
-		panic(err)
-	}
-
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logrus.Errorln("sync comment song panic", r, "=>", util.GetCurrentGoroutineStack())
-			}
-		}()
-		if forceSyncAfter.Unix() == 0 {
-			newCommentIds := make(map[uint64]bool)
-			for i := range *song {
-				newCommentIds[(*song)[i].DoubanId] = true
-			}
-			oldCommentIds := dao.GetCommentIds(user.DoubanUid, consts.TypeSong.Code)
-			for i := range *oldCommentIds {
-				id := (*oldCommentIds)[i]
-				if !newCommentIds[id] {
-					dao.HideComment(user.DoubanUid, consts.TypeSong.Code, id)
-				}
-			}
-		}
-		for i := range *song {
-			item := &(*song)[i]
-			dao.UpsertComment(&(*comment)[i])
-
-			added := dao.CreateSongNx(item)
-			if added {
-				dao.CreateScheduleNx(item.DoubanId, consts.TypeSong.Code, consts.ScheduleToCrawl.Code, consts.ScheduleUnready.Code)
-			}
-		}
-	}()
+	syncComment(
+		user,
+		forceSyncAfter,
+		crawl.CommentSong,
+		dao.CreateSongNx,
+		dao.CreateScheduleNx,
+		"song",
+		consts.TypeSong.Code,
+		func(item *model.Song) uint64 { return item.DoubanId },
+	)
 }

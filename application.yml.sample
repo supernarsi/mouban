@@ -7,6 +7,9 @@ server:
   port: 8080
   limit: 1h
 
+log:
+  level: info  # debug, info, warn, error
+
 agent:
   enable: false
   flow:

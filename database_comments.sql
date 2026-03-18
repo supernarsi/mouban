@@ -1,0 +1,355 @@
+-- 数据库表结构注释脚本
+-- 适用于 MySQL 8.0+
+-- 执行前请确认数据库名称
+
+USE mouban;
+
+-- ============================================
+-- 1. user - 用户信息表
+-- ============================================
+
+ALTER TABLE `user` COMMENT '豆瓣用户信息表 - 存储用户基本信息和各类目数量统计';
+
+ALTER TABLE `user`
+    MODIFY COLUMN `id` BIGINT UNSIGNED AUTO_INCREMENT COMMENT '自增主键 ID',
+    MODIFY COLUMN `douban_uid` BIGINT NOT NULL COMMENT '豆瓣用户 ID',
+    MODIFY COLUMN `domain` VARCHAR(64) NOT NULL COMMENT '豆瓣个人主页域名 (如 ahbei)',
+    MODIFY COLUMN `name` VARCHAR(512) NOT NULL COMMENT '用户昵称',
+    MODIFY COLUMN `thumbnail` VARCHAR(512) DEFAULT NULL COMMENT '用户头像 URL (已转存到 S3)',
+    MODIFY COLUMN `book_wish` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '想读数量',
+    MODIFY COLUMN `book_do` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '在读数量',
+    MODIFY COLUMN `book_collect` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '读过数量',
+    MODIFY COLUMN `game_wish` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '想玩数量',
+    MODIFY COLUMN `game_do` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '在玩数量',
+    MODIFY COLUMN `game_collect` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '玩过数量',
+    MODIFY COLUMN `movie_wish` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '想看数量',
+    MODIFY COLUMN `movie_do` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '在看数量',
+    MODIFY COLUMN `movie_collect` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '看过数量',
+    MODIFY COLUMN `song_wish` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '想听数量',
+    MODIFY COLUMN `song_do` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '在听数量',
+    MODIFY COLUMN `song_collect` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '听过数量',
+    MODIFY COLUMN `sync_at` DATETIME DEFAULT NULL COMMENT '最近同步时间',
+    MODIFY COLUMN `check_at` DATETIME DEFAULT NULL COMMENT '最近检测时间',
+    MODIFY COLUMN `register_at` DATETIME DEFAULT NULL COMMENT '注册时间 (首次抓取时间)',
+    MODIFY COLUMN `publish_at` DATETIME DEFAULT NULL COMMENT '用户最近发布时间 (用于判断是否变化)',
+    MODIFY COLUMN `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
+    MODIFY COLUMN `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间';
+
+-- ============================================
+-- 2. book - 书籍信息表
+-- ============================================
+
+ALTER TABLE `book` COMMENT '书籍条目信息表 - 存储书籍详细信息';
+
+ALTER TABLE `book`
+    MODIFY COLUMN `id` BIGINT UNSIGNED AUTO_INCREMENT COMMENT '自增主键 ID',
+    MODIFY COLUMN `douban_id` BIGINT NOT NULL COMMENT '豆瓣书籍 ID',
+    MODIFY COLUMN `title` VARCHAR(1024) NOT NULL COMMENT '书名',
+    MODIFY COLUMN `subtitle` VARCHAR(1024) DEFAULT NULL COMMENT '副标题',
+    MODIFY COLUMN `orititle` VARCHAR(1024) DEFAULT NULL COMMENT '原作名 (翻译书籍的原名)',
+    MODIFY COLUMN `author` VARCHAR(1024) DEFAULT NULL COMMENT '作者 (多人用分隔符)',
+    MODIFY COLUMN `translator` VARCHAR(512) DEFAULT NULL COMMENT '译者',
+    MODIFY COLUMN `press` VARCHAR(512) DEFAULT NULL COMMENT '出版社',
+    MODIFY COLUMN `producer` VARCHAR(512) DEFAULT NULL COMMENT '出品方',
+    MODIFY COLUMN `serial` VARCHAR(512) DEFAULT NULL COMMENT '丛书名',
+    MODIFY COLUMN `publish_date` VARCHAR(64) DEFAULT NULL COMMENT '出版年月',
+    MODIFY COLUMN `isbn` VARCHAR(64) DEFAULT NULL COMMENT 'ISBN 号',
+    MODIFY COLUMN `framing` VARCHAR(512) DEFAULT NULL COMMENT '装帧 (精装/平装等)',
+    MODIFY COLUMN `page` INT UNSIGNED DEFAULT NULL COMMENT '页数',
+    MODIFY COLUMN `price` INT UNSIGNED DEFAULT NULL COMMENT '定价 (单位：分)',
+    MODIFY COLUMN `book_intro` MEDIUMTEXT DEFAULT NULL COMMENT '书籍简介',
+    MODIFY COLUMN `author_intro` MEDIUMTEXT DEFAULT NULL COMMENT '作者简介',
+    MODIFY COLUMN `thumbnail` VARCHAR(512) DEFAULT NULL COMMENT '封面图 URL (已转存到 S3)',
+    MODIFY COLUMN `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
+    MODIFY COLUMN `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间';
+
+-- ============================================
+-- 3. movie - 电影信息表
+-- ============================================
+
+ALTER TABLE `movie` COMMENT '电影条目信息表 - 存储电影详细信息';
+
+ALTER TABLE `movie`
+    MODIFY COLUMN `id` BIGINT UNSIGNED AUTO_INCREMENT COMMENT '自增主键 ID',
+    MODIFY COLUMN `douban_id` BIGINT NOT NULL COMMENT '豆瓣电影 ID',
+    MODIFY COLUMN `title` VARCHAR(512) NOT NULL COMMENT '电影名称',
+    MODIFY COLUMN `director` VARCHAR(512) DEFAULT NULL COMMENT '导演',
+    MODIFY COLUMN `writer` VARCHAR(512) DEFAULT NULL COMMENT '编剧',
+    MODIFY COLUMN `actor` VARCHAR(2048) DEFAULT NULL COMMENT '主演 (多人)',
+    MODIFY COLUMN `style` VARCHAR(512) DEFAULT NULL COMMENT '类型/风格',
+    MODIFY COLUMN `site` VARCHAR(512) DEFAULT NULL COMMENT '官方网站',
+    MODIFY COLUMN `country` VARCHAR(512) DEFAULT NULL COMMENT '制片国家/地区',
+    MODIFY COLUMN `language` VARCHAR(512) DEFAULT NULL COMMENT '语言',
+    MODIFY COLUMN `publish_date` VARCHAR(512) DEFAULT NULL COMMENT '上映日期',
+    MODIFY COLUMN `episode` INT UNSIGNED DEFAULT NULL COMMENT '集数 (电视剧)',
+    MODIFY COLUMN `duration` INT UNSIGNED DEFAULT NULL COMMENT '片长 (分钟)',
+    MODIFY COLUMN `alias` VARCHAR(512) DEFAULT NULL COMMENT '又名',
+    MODIFY COLUMN `imdb` VARCHAR(512) DEFAULT NULL COMMENT 'IMDb 链接',
+    MODIFY COLUMN `intro` MEDIUMTEXT DEFAULT NULL COMMENT '简介',
+    MODIFY COLUMN `thumbnail` VARCHAR(512) DEFAULT NULL COMMENT '海报 URL (已转存到 S3)',
+    MODIFY COLUMN `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
+    MODIFY COLUMN `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间';
+
+-- ============================================
+-- 4. game - 游戏信息表
+-- ============================================
+
+ALTER TABLE `game` COMMENT '游戏条目信息表 - 存储游戏详细信息';
+
+ALTER TABLE `game`
+    MODIFY COLUMN `id` BIGINT UNSIGNED AUTO_INCREMENT COMMENT '自增主键 ID',
+    MODIFY COLUMN `douban_id` BIGINT NOT NULL COMMENT '豆瓣游戏 ID',
+    MODIFY COLUMN `title` VARCHAR(512) NOT NULL COMMENT '游戏名称',
+    MODIFY COLUMN `platform` VARCHAR(512) DEFAULT NULL COMMENT '平台 (PC/PS5/Switch 等)',
+    MODIFY COLUMN `genre` VARCHAR(512) DEFAULT NULL COMMENT '类型',
+    MODIFY COLUMN `alias` VARCHAR(512) DEFAULT NULL COMMENT '又名',
+    MODIFY COLUMN `developer` VARCHAR(512) DEFAULT NULL COMMENT '开发商',
+    MODIFY COLUMN `publisher` VARCHAR(512) DEFAULT NULL COMMENT '发行商',
+    MODIFY COLUMN `publish_date` VARCHAR(512) DEFAULT NULL COMMENT '发行日期',
+    MODIFY COLUMN `intro` MEDIUMTEXT DEFAULT NULL COMMENT '游戏简介',
+    MODIFY COLUMN `thumbnail` VARCHAR(512) DEFAULT NULL COMMENT '封面图 URL (已转存到 S3)',
+    MODIFY COLUMN `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
+    MODIFY COLUMN `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间';
+
+-- ============================================
+-- 5. song - 音乐信息表
+-- ============================================
+
+ALTER TABLE `song` COMMENT '音乐专辑信息表 - 存储音乐专辑详细信息';
+
+ALTER TABLE `song`
+    MODIFY COLUMN `id` BIGINT UNSIGNED AUTO_INCREMENT COMMENT '自增主键 ID',
+    MODIFY COLUMN `douban_id` BIGINT NOT NULL COMMENT '豆瓣音乐 ID',
+    MODIFY COLUMN `title` VARCHAR(512) NOT NULL COMMENT '专辑名称',
+    MODIFY COLUMN `alias` VARCHAR(512) DEFAULT NULL COMMENT '又名',
+    MODIFY COLUMN `musician` VARCHAR(2048) DEFAULT NULL COMMENT '音乐人/乐队',
+    MODIFY COLUMN `album_type` VARCHAR(512) DEFAULT NULL COMMENT '专辑类型 (录音室/现场/精选等)',
+    MODIFY COLUMN `genre` VARCHAR(512) DEFAULT NULL COMMENT '流派',
+    MODIFY COLUMN `media` VARCHAR(512) DEFAULT NULL COMMENT '介质 (CD/黑胶/数字等)',
+    MODIFY COLUMN `barcode` VARCHAR(512) DEFAULT NULL COMMENT '条形码',
+    MODIFY COLUMN `publisher` VARCHAR(512) DEFAULT NULL COMMENT '出版者',
+    MODIFY COLUMN `publish_date` VARCHAR(512) DEFAULT NULL COMMENT '发行时间',
+    MODIFY COLUMN `isrc` VARCHAR(512) DEFAULT NULL COMMENT 'ISRC 编码',
+    MODIFY COLUMN `album_count` INT UNSIGNED DEFAULT NULL COMMENT '唱片数',
+    MODIFY COLUMN `intro` MEDIUMTEXT DEFAULT NULL COMMENT '专辑简介',
+    MODIFY COLUMN `track_list` MEDIUMTEXT DEFAULT NULL COMMENT '曲目列表',
+    MODIFY COLUMN `thumbnail` VARCHAR(512) DEFAULT NULL COMMENT '封面图 URL (已转存到 S3)',
+    MODIFY COLUMN `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
+    MODIFY COLUMN `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间';
+
+-- ============================================
+-- 6. comment - 用户评论表
+-- ============================================
+
+ALTER TABLE `comment` COMMENT '用户评论表 - 存储用户对条目的评论/标注/评分记录';
+
+ALTER TABLE `comment`
+    MODIFY COLUMN `id` BIGINT UNSIGNED AUTO_INCREMENT COMMENT '自增主键 ID',
+    MODIFY COLUMN `douban_uid` BIGINT NOT NULL COMMENT '豆瓣用户 ID',
+    MODIFY COLUMN `douban_id` BIGINT NOT NULL COMMENT '条目 ID (书/影/音/游)',
+    MODIFY COLUMN `type` TINYINT NOT NULL COMMENT '条目类型：0=用户，1=书，2=电影，3=游戏，4=音乐',
+    MODIFY COLUMN `rate` TINYINT DEFAULT NULL COMMENT '评分 (0-5 星，0 表示未评分)',
+    MODIFY COLUMN `label` VARCHAR(512) DEFAULT NULL COMMENT '标签/关键词',
+    MODIFY COLUMN `comment` MEDIUMTEXT DEFAULT NULL COMMENT '评论内容',
+    MODIFY COLUMN `action` TINYINT NOT NULL COMMENT '操作类型：0=do,1=wish,2=collect,3=hide',
+    MODIFY COLUMN `mark_date` DATETIME NOT NULL COMMENT '用户标记时间 (评论发布日期)',
+    MODIFY COLUMN `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
+    MODIFY COLUMN `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间';
+
+-- ============================================
+-- 7. rating - 评分统计表
+-- ============================================
+
+ALTER TABLE `rating` COMMENT '评分统计表 - 存储条目的聚合评分数据';
+
+ALTER TABLE `rating`
+    MODIFY COLUMN `id` BIGINT UNSIGNED AUTO_INCREMENT COMMENT '自增主键 ID',
+    MODIFY COLUMN `type` TINYINT NOT NULL COMMENT '条目类型：1=书，2=电影，3=游戏，4=音乐',
+    MODIFY COLUMN `douban_id` BIGINT NOT NULL COMMENT '条目 ID',
+    MODIFY COLUMN `total` INT UNSIGNED DEFAULT NULL COMMENT '评分总人数',
+    MODIFY COLUMN `rating` FLOAT DEFAULT NULL COMMENT '平均分 (0-10 分)',
+    MODIFY COLUMN `star5` FLOAT DEFAULT NULL COMMENT '5 星占比 (百分比)',
+    MODIFY COLUMN `star4` FLOAT DEFAULT NULL COMMENT '4 星占比 (百分比)',
+    MODIFY COLUMN `star3` FLOAT DEFAULT NULL COMMENT '3 星占比 (百分比)',
+    MODIFY COLUMN `star2` FLOAT DEFAULT NULL COMMENT '2 星占比 (百分比)',
+    MODIFY COLUMN `star1` FLOAT DEFAULT NULL COMMENT '1 星占比 (百分比)',
+    MODIFY COLUMN `status` TINYINT DEFAULT NULL COMMENT '状态：0=正常，1=人数不足，2=不允许显示',
+    MODIFY COLUMN `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
+    MODIFY COLUMN `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间';
+
+-- ============================================
+-- 8. schedule - 爬虫调度队列
+-- ============================================
+
+ALTER TABLE `schedule` COMMENT '爬虫调度队列表 - 存储待爬取任务队列';
+
+ALTER TABLE `schedule`
+    MODIFY COLUMN `id` BIGINT UNSIGNED AUTO_INCREMENT COMMENT '自增主键 ID',
+    MODIFY COLUMN `douban_id` BIGINT NOT NULL COMMENT '目标 ID (用户 ID 或条目 ID)',
+    MODIFY COLUMN `type` TINYINT NOT NULL COMMENT '类型：0=用户，1=书，2=电影，3=游戏，4=音乐',
+    MODIFY COLUMN `status` TINYINT NOT NULL COMMENT '爬取状态：0=待爬取，1=爬取中，2=已爬取，3=可爬取',
+    MODIFY COLUMN `result` TINYINT NOT NULL COMMENT '爬取结果：0=未就绪，1=就绪，2=无效',
+    MODIFY COLUMN `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '任务创建时间',
+    MODIFY COLUMN `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '任务更新时间';
+
+-- ============================================
+-- 9. access - 访问日志表
+-- ============================================
+
+ALTER TABLE `access` COMMENT '访问日志表 - 记录 API 访问日志，用于限流和审计';
+
+ALTER TABLE `access`
+    MODIFY COLUMN `id` BIGINT UNSIGNED AUTO_INCREMENT COMMENT '自增主键 ID',
+    MODIFY COLUMN `douban_uid` BIGINT NOT NULL COMMENT '豆瓣用户 ID (请求参数)',
+    MODIFY COLUMN `path` VARCHAR(64) NOT NULL COMMENT '请求路径',
+    MODIFY COLUMN `ip` VARCHAR(64) NOT NULL COMMENT '请求 IP',
+    MODIFY COLUMN `user_agent` VARCHAR(512) NOT NULL COMMENT 'User-Agent',
+    MODIFY COLUMN `referer` VARCHAR(512) NOT NULL COMMENT 'Referer 来源',
+    MODIFY COLUMN `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '访问时间',
+    MODIFY COLUMN `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间';
+
+-- ============================================
+-- 10. storage - 存储映射表
+-- ============================================
+
+ALTER TABLE `storage` COMMENT '存储映射表 - 记录原始图片 URL 到 S3 存储的映射关系';
+
+ALTER TABLE `storage`
+    MODIFY COLUMN `id` BIGINT UNSIGNED AUTO_INCREMENT COMMENT '自增主键 ID',
+    MODIFY COLUMN `source` VARCHAR(256) NOT NULL COMMENT '原始图片 URL',
+    MODIFY COLUMN `target` VARCHAR(256) NOT NULL COMMENT 'S3 存储后的 URL',
+    MODIFY COLUMN `md5` VARCHAR(64) NOT NULL COMMENT '图片内容 MD5 值 (用于去重)',
+    MODIFY COLUMN `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
+    MODIFY COLUMN `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间';
+
+-- ============================================
+-- 验证注释是否添加成功
+-- ============================================
+
+-- 查看所有表的注释
+SELECT
+    TABLE_NAME AS '表名',
+    TABLE_COMMENT AS '表注释'
+FROM INFORMATION_SCHEMA.TABLES
+WHERE TABLE_SCHEMA = 'mouban'
+ORDER BY TABLE_NAME;
+
+-- 查看 user 表的字段注释
+SELECT
+    COLUMN_NAME AS '字段名',
+    COLUMN_TYPE AS '类型',
+    COLUMN_KEY AS '键',
+    IS_NULLABLE AS '可空',
+    COLUMN_DEFAULT AS '默认值',
+    COLUMN_COMMENT AS '注释'
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = 'mouban' AND TABLE_NAME = 'user'
+ORDER BY ORDINAL_POSITION;
+
+-- 查看 book 表的字段注释
+SELECT
+    COLUMN_NAME AS '字段名',
+    COLUMN_TYPE AS '类型',
+    COLUMN_KEY AS '键',
+    IS_NULLABLE AS '可空',
+    COLUMN_DEFAULT AS '默认值',
+    COLUMN_COMMENT AS '注释'
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = 'mouban' AND TABLE_NAME = 'book'
+ORDER BY ORDINAL_POSITION;
+
+-- 查看 movie 表的字段注释
+SELECT
+    COLUMN_NAME AS '字段名',
+    COLUMN_TYPE AS '类型',
+    COLUMN_KEY AS '键',
+    IS_NULLABLE AS '可空',
+    COLUMN_DEFAULT AS '默认值',
+    COLUMN_COMMENT AS '注释'
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = 'mouban' AND TABLE_NAME = 'movie'
+ORDER BY ORDINAL_POSITION;
+
+-- 查看 game 表的字段注释
+SELECT
+    COLUMN_NAME AS '字段名',
+    COLUMN_TYPE AS '类型',
+    COLUMN_KEY AS '键',
+    IS_NULLABLE AS '可空',
+    COLUMN_DEFAULT AS '默认值',
+    COLUMN_COMMENT AS '注释'
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = 'mouban' AND TABLE_NAME = 'game'
+ORDER BY ORDINAL_POSITION;
+
+-- 查看 song 表的字段注释
+SELECT
+    COLUMN_NAME AS '字段名',
+    COLUMN_TYPE AS '类型',
+    COLUMN_KEY AS '键',
+    IS_NULLABLE AS '可空',
+    COLUMN_DEFAULT AS '默认值',
+    COLUMN_COMMENT AS '注释'
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = 'mouban' AND TABLE_NAME = 'song'
+ORDER BY ORDINAL_POSITION;
+
+-- 查看 comment 表的字段注释
+SELECT
+    COLUMN_NAME AS '字段名',
+    COLUMN_TYPE AS '类型',
+    COLUMN_KEY AS '键',
+    IS_NULLABLE AS '可空',
+    COLUMN_DEFAULT AS '默认值',
+    COLUMN_COMMENT AS '注释'
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = 'mouban' AND TABLE_NAME = 'comment'
+ORDER BY ORDINAL_POSITION;
+
+-- 查看 rating 表的字段注释
+SELECT
+    COLUMN_NAME AS '字段名',
+    COLUMN_TYPE AS '类型',
+    COLUMN_KEY AS '键',
+    IS_NULLABLE AS '可空',
+    COLUMN_DEFAULT AS '默认值',
+    COLUMN_COMMENT AS '注释'
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = 'mouban' AND TABLE_NAME = 'rating'
+ORDER BY ORDINAL_POSITION;
+
+-- 查看 schedule 表的字段注释
+SELECT
+    COLUMN_NAME AS '字段名',
+    COLUMN_TYPE AS '类型',
+    COLUMN_KEY AS '键',
+    IS_NULLABLE AS '可空',
+    COLUMN_DEFAULT AS '默认值',
+    COLUMN_COMMENT AS '注释'
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = 'mouban' AND TABLE_NAME = 'schedule'
+ORDER BY ORDINAL_POSITION;
+
+-- 查看 access 表的字段注释
+SELECT
+    COLUMN_NAME AS '字段名',
+    COLUMN_TYPE AS '类型',
+    COLUMN_KEY AS '键',
+    IS_NULLABLE AS '可空',
+    COLUMN_DEFAULT AS '默认值',
+    COLUMN_COMMENT AS '注释'
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = 'mouban' AND TABLE_NAME = 'access'
+ORDER BY ORDINAL_POSITION;
+
+-- 查看 storage 表的字段注释
+SELECT
+    COLUMN_NAME AS '字段名',
+    COLUMN_TYPE AS '类型',
+    COLUMN_KEY AS '键',
+    IS_NULLABLE AS '可空',
+    COLUMN_DEFAULT AS '默认值',
+    COLUMN_COMMENT AS '注释'
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = 'mouban' AND TABLE_NAME = 'storage'
+ORDER BY ORDINAL_POSITION;

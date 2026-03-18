@@ -24,7 +24,7 @@ func itemSelector(ch chan *model.Schedule) {
 		for _, t := range types {
 			pendingSchedule := dao.SearchScheduleByStatus(t.Code, consts.ScheduleToCrawl.Code)
 			if pendingSchedule != nil {
-				logrus.Infoln("pending", t.Name, "item found", pendingSchedule.DoubanId)
+				logrus.WithField("douban_id", pendingSchedule.DoubanId).Debugln("pending", t.Name, "item found")
 
 				changed := dao.CasScheduleStatus(pendingSchedule.DoubanId, t.Code, consts.ScheduleCrawling.Code, *pendingSchedule.Status)
 				if changed {
@@ -35,7 +35,7 @@ func itemSelector(ch chan *model.Schedule) {
 
 			retrySchedule := dao.SearchScheduleByAll(t.Code, consts.ScheduleCrawled.Code, consts.ScheduleUnready.Code)
 			if retrySchedule != nil {
-				logrus.Infoln("retry", t.Name, "item found", retrySchedule.DoubanId)
+				logrus.WithField("douban_id", retrySchedule.DoubanId).Debugln("retry", t.Name, "item found")
 				changed := dao.CasScheduleStatus(retrySchedule.DoubanId, t.Code, consts.ScheduleCrawling.Code, *retrySchedule.Status)
 				if changed {
 					ch <- retrySchedule
@@ -45,7 +45,7 @@ func itemSelector(ch chan *model.Schedule) {
 
 			discoverSchedule := dao.SearchScheduleByStatus(t.Code, consts.ScheduleCanCrawl.Code)
 			if discoverSchedule != nil {
-				logrus.Infoln("discover", t.Name, "item found", discoverSchedule.DoubanId)
+				logrus.WithField("douban_id", discoverSchedule.DoubanId).Debugln("discover", t.Name, "item found")
 				changed := dao.CasScheduleStatus(discoverSchedule.DoubanId, t.Code, consts.ScheduleCrawling.Code, *discoverSchedule.Status)
 				if changed {
 					ch <- discoverSchedule
@@ -66,10 +66,18 @@ func itemWorker(index int, ch chan *model.Schedule) {
 
 	for schedule := range ch {
 		t := consts.ParseType(schedule.Type)
-		logrus.Infoln("item thread", index, "start", t.Name, strconv.FormatUint(schedule.DoubanId, 10))
+		logrus.WithFields(logrus.Fields{
+			"type":       t.Name,
+			"douban_id":  strconv.FormatUint(schedule.DoubanId, 10),
+			"thread_idx": index,
+		}).Infoln("item processing started")
 		processItem(schedule.Type, schedule.DoubanId)
 		dao.CasScheduleStatus(schedule.DoubanId, t.Code, consts.ScheduleCrawled.Code, consts.ScheduleCrawling.Code)
-		logrus.Infoln("item thread", index, "end", t.Name, strconv.FormatUint(schedule.DoubanId, 10))
+		logrus.WithFields(logrus.Fields{
+			"type":       t.Name,
+			"douban_id":  strconv.FormatUint(schedule.DoubanId, 10),
+			"thread_idx": index,
+		}).Infoln("item processing completed")
 	}
 }
 
@@ -94,5 +102,5 @@ func init() {
 		}()
 	}
 
-	logrus.Infoln(concurrency, "item agent(s) enabled")
+	logrus.WithField("concurrency", concurrency).Infoln("item agent(s) enabled")
 }
