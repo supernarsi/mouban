@@ -1,71 +1,134 @@
 # mouban
 
-> 截至 2025年06月，已汇总有效数据（去除了不存在的条目、被封禁条目后）：图书 447w 本、电影 48w 部、音乐 120w 首、游戏 3.8w 部。
+## 功能特性
 
-本服务作为 [hexo-douban](https://github.com/mythsman/hexo-douban) 项目的后台数据获取服务，用于根据用户的豆瓣ID，获取用户在豆瓣的书、影、音、游中的标注信息，方便用户快速提取。
+- 用户数据抓取：自动获取豆瓣用户的书影音游标注信息
+- 增量同步：基于 RSS 和评论时间的增量更新机制
+- 条目发现：通过关联推荐自动发现新的条目和用户
+- 定时任务：每日自动更新首页条目
+- 数据持久化：MySQL 存储，支持 9 张数据表
+- 监控指标：内置 Prometheus metrics 端点
+- Docker 部署：支持容器化快速部署
 
-[![dockeri.co](https://dockerico.blankenship.io/image/mythsman/mouban)](https://hub.docker.com/r/mythsman/mouban)
+## 架构设计
 
-## 流程
-
-简要的处理流程如下：
-
-1. 用户输入个人豆瓣ID。
-2. 访问读书首页获取用户头像、域名等信息。
-3. 访问个人 rss 页面获得用户最新更新时间用于去重。
-4. 访问用户书、影、音、游的首页获取总数等信息。
-5. 滚动访问用户书、影、音、游的评论页获取评论信息、条目概览。
-6. 访问条目详情页获取详细信息，并自动发现其他推荐的用户和条目。
-7. 每天定时更新书、影、音、游的首页，获取最新条目。
-
-## 部署
-
-可以使用 docker-compose 进行快速部署，环境变量与 application.yml.sample 中的配置对应：
-
-```yaml
-    mouban:
-      image: mythsman/mouban
-      container_name: "mouban"
-      restart: always
-      expose:
-        - "8080"
-      environment:
-        - GIN_MODE=release
-        - agent__enable=true
-        - agent__flow__discover=false
-        - agent__discover__level=1
-        - agent__item__concurrency=5
-        - agent__item__max=10000
-        - http__timeout=30000
-        - http__retry_max=20
-        - http__interval__user=5000
-        - http__interval__item=2000
-        - http__auth=11111:ABCDEFG,http://user:pass@ip:port;
-        - server__cors=https://yourdomain.com
-        - server__limit=30m
-        - datasource__host=host for mysql
-        - datasource__username=user name for mysql
-        - datasource__password=passwd for mysql
+```
+main.go (入口 + Gin 路由)
+    │
+    ├── common/        # 初始化：配置 (Viper)、数据库 (GORM)、日志 (logrus)
+    ├── controller/    # HTTP 处理器：/admin/* 和 /guest/* 端点
+    ├── agent/         # 后台 Worker：定时爬虫任务
+    ├── crawl/         # 网页抓取：HTTP 客户端、HTML 解析、限流
+    ├── dao/           # 数据访问层：GORM 操作
+    ├── model/         # 数据模型：Book/Movie/Game/Song/User/Comment 等
+    ├── consts/        # 常量定义：类型码、URL 模式
+    └── util/          # 工具函数：JSON 解析、堆栈追踪
 ```
 
-其中最重要的是 http__auth 参数，用于配置登陆态的用户信息和走的http代理，格式为 `<dbcl2>,http://<user>:<password>@<proxyIp>:<proxyPort>;`
-，可以配置多个。需要注意的是，豆瓣对于未登录的账号有概率会投毒（[例子](https://movie.douban.com/subject/4881682/)），所以这里采用登陆态账号来处理。
+## 快速开始
 
-dbcl2需要在cookie中查看：
-![img.png](image/img.png)
+### 构建
 
-## 接口
+```bash
+# 本地运行
+go run main.go
 
-以下为服务暴露的主要接口。线上已经部署了一套公共服务，域名使用 `https://mouban.mythsman.com/` 。
+# 生产构建（Linux amd64 二进制 + Docker）
+GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -ldflags="-s -w" -o main main.go
+docker build -t mythsman/mouban -f Dockerfile --platform=linux/amd64 .
+```
 
-### 常用接口
+### 配置
+
+配置文件 `application.yml`：
+
+```yaml
+server:
+  cors: http://localhost
+  port: 8080
+  limit: 1h
+agent:
+  enable: true
+  flow:
+    discover: false
+  user:
+    concurrency: 3
+  item:
+    concurrency: 3
+    max: 3000
+datasource:
+  driver: mysql
+  host: localhost
+  port: 3306
+  database: mouban
+  username: root
+  password: your_password
+http:
+  timeout: 10000
+  retry_max: 20
+  auth: dbcl2_cookie_value,http://user:pass@proxy:port;
+```
+
+环境变量覆盖（`KEY__SUBKEY` 格式）：
+
+```bash
+export GIN_MODE=release
+export server__cors=https://yourdomain.com
+export datasource__host=localhost
+export datasource__username=root
+export datasource__password=secret
+export agent__enable=true
+```
+
+### Docker Compose 部署
+
+```yaml
+services:
+  mouban:
+    image: mythsman/mouban
+    container_name: mouban
+    restart: always
+    expose:
+      - "8080"
+    environment:
+      - GIN_MODE=release
+      - agent__enable=true
+      - agent__flow__discover=false
+      - agent__item__concurrency=5
+      - agent__item__max=10000
+      - http__timeout=30000
+      - http__retry_max=20
+      - http__interval__user=5000
+      - http__interval__item=2000
+      - server__cors=https://yourdomain.com
+      - server__limit=30m
+      - datasource__host=mysql-host
+      - datasource__username=mysql-user
+      - datasource__password=mysql-passwd
+```
+
+**重要**: `http__auth` 参数用于配置豆瓣登录态和 HTTP 代理，格式为：
+```
+<dbcl2_cookie>,http://<user>:<password>@<proxy_ip>:<proxy_port>;
+```
+
+`dbcl2` 需从豆瓣 Cookie 中获取。使用登录态可避免豆瓣对未登录用户的投毒策略。
+
+## API 接口
+
+### 访客接口
 
 #### 用户录入/更新
 
-`http://localhost:8080/guest/check_user?id={your_douban_id}`
+```
+GET /guest/check_user?id={douban_id}
+```
+
+响应示例：
 
 ```json
 {
+  "success": true,
   "result": {
     "id": 1000001,
     "domain": "ahbei",
@@ -74,9 +137,6 @@ dbcl2需要在cookie中查看：
     "book_wish": 81,
     "book_do": 61,
     "book_collect": 115,
-    "game_wish": 1,
-    "game_do": 0,
-    "game_collect": 0,
     "movie_wish": 77,
     "movie_do": 17,
     "movie_collect": 218,
@@ -86,78 +146,103 @@ dbcl2需要在cookie中查看：
     "sync_at": 1667232000,
     "check_at": 1679646797,
     "publish_at": 1570409179
-  },
-  "success": true
+  }
 }
 ```
 
-其中：
+时间戳说明：
+- `publish_at`: 用户最近一次更新的时间
+- `check_at`: 最近一次检测用户更新的时间
+- `sync_at`: 最近一次同步用户信息的时间
 
-* publish_at 表示用户最近一次更新的时间戳。
-* check_at 表示最近一次**检测**用户是否有更新的时间戳。
-* sync_at 表示最近一次**同步**用户信息的时间戳。
+#### 查询用户评论
 
-#### 查询用户的读书评论
+| 类型 | 接口 |
+|------|------|
+| 读书 | `/guest/user_book?id={id}&action={wish\|do\|collect}` |
+| 电影 | `/guest/user_movie?id={id}&action={wish\|do\|collect}` |
+| 游戏 | `/guest/user_game?id={id}&action={wish\|do\|collect}` |
+| 音乐 | `/guest/user_song?id={id}&action={wish\|do\|collect}` |
 
-`http://localhost:8080/guest/user_book?id={your_douban_id}&action=wish`
+### 管理接口
 
-`http://localhost:8080/guest/user_book?id={your_douban_id}&action=do`
+#### 加载 Sitemap 数据
 
-`http://localhost:8080/guest/user_book?id={your_douban_id}&action=collect`
+```
+GET /admin/load_data?path={sitemap_file_path}
+```
 
-#### 查询用户的电影评论
-
-`http://localhost:8080/guest/user_movie?id={your_douban_id}&action=wish`
-
-`http://localhost:8080/guest/user_movie?id={your_douban_id}&action=do`
-
-`http://localhost:8080/guest/user_movie?id={your_douban_id}&action=collect`
-
-#### 查询用户的游戏评论
-
-`http://localhost:8080/guest/user_game?id={your_douban_id}&action=wish`
-
-`http://localhost:8080/guest/user_game?id={your_douban_id}&action=do`
-
-`http://localhost:8080/guest/user_game?id={your_douban_id}&action=collect`
-
-#### 查询用户的音乐评论
-
-`http://localhost:8080/guest/user_song?id={your_douban_id}&action=wish`
-
-`http://localhost:8080/guest/user_song?id={your_douban_id}&action=do`
-
-`http://localhost:8080/guest/user_song?id={your_douban_id}&action=collect`
-
-### 后台接口
-
-#### 加载 sitemap 数据
-
-豆瓣在他的[robots.txt](https://www.douban.com/robots.txt)中分享了他的
-sitemap，并且一直持续更新。因此我们可以通过 [sitemap_index](https://www.douban.com/sitemap_index.xml)
-和 [sitemap_updated_index](https://www.douban.com/sitemap_updated_index.xml) 将存量数据离线下载下来，解压后按类型 grep
-条目后直接一次性导入，节省了对存量数据的爬虫搜索逻辑。
-
-加载离线 sitemap 数据。数据需要事先下载，并挂载到 docker 进程的指定路径下。
-
-`http://localhost:8080/admin/load_data?path={path_to_local_sitemap_file}`
-
-需要注意的是，sitemap 的数据并不全。除了举反例证明外，还有一个明显的例子，就是在 sitemap
-中，书籍的条目数从 [五年前](https://www.zhihu.com/question/19583157/answer/140028235) 左右开始就是 3088633 条，但是最近一次更新时，发现 sitemap
-中记录的书籍数还是这么多（即使 sitemap 本身也在更新）。因此增量更新始终是必要的。
+从豆瓣 [sitemap_index](https://www.douban.com/sitemap_index.xml) 离线加载存量数据。
 
 #### 强制更新条目
 
-目前条目下载好后，后续不会进行更新，如有更新需要，目前暂时需要手动强制更新一下。
-
-item_type 取: 1-book 2-movie 3-game 4-song
-
-`http://localhost:8080/admin/refresh_item?type={item_type}&id={item_douban_id}`
+```
+GET /admin/refresh_item?type={1-book\|2-movie\|3-game\|4-song}&id={item_id}
+```
 
 #### 强制更新用户
 
-目前用户的评论信息更新下载好后，后续只会进行增量更新。如果对老的条目进行评论修改、删除等操作是不会同步更新的。
+```
+GET /admin/refresh_user?id={douban_uid}
+```
 
-如有更新的要求，目前暂时需要手动强制更新一下。（谨慎使用，会对系统造成较大压力）
+谨慎使用，会对系统造成较大压力。
 
-`http://localhost:8080/admin/refresh_user?id={douban_uid}`
+### 监控端点
+
+```
+GET /metrics
+```
+
+Prometheus 格式的监控指标。
+
+## 数据流
+
+1. 用户调用 `/guest/check_user` 触发用户资料抓取
+2. 抓取用户读书首页获取头像、域名等信息
+3. 访问 RSS 页面获取最新更新时间用于去重
+4. 滚动抓取用户书影音游评论页
+5. 抓取条目详情页，发现关联的用户和条目
+6. 新条目加入调度队列等待抓取
+7. 每日定时任务更新首页条目
+
+## 测试
+
+```bash
+# 运行所有测试
+go test ./...
+
+# 运行单个包测试
+go test ./dao/
+go test ./util/
+
+# 运行特定测试
+go test -run TestFunctionName ./path/to/package/
+
+# 代码检查
+golangci-lint run
+```
+
+## 数据库
+
+自动创建 9 张表：
+
+| 表名 | 说明 |
+|------|------|
+| users | 用户资料 |
+| books | 图书条目 |
+| movies | 电影条目 |
+| games | 游戏条目 |
+| songs | 音乐条目 |
+| comments | 用户评论 |
+| ratings | 聚合评分 |
+| schedules | 爬虫任务队列 |
+| access | 限流令牌 |
+
+## 许可证
+
+MIT License
+
+## 相关项目
+
+- [hexo-douban](https://github.com/mythsman/hexo-douban) - Hexo 豆瓣数据插件
