@@ -19,4 +19,5 @@ application.yml
 # vendor/
 main
 mouban
+docs/
 sql/
