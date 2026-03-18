@@ -5,29 +5,29 @@ import (
 )
 
 type User struct {
-	ID           uint64
-	DoubanUid    uint64 `gorm:"not null;uniqueIndex"`
-	Domain       string `gorm:"not hull;index;type:varchar(64)"`
-	Name         string `gorm:"not null;type:varchar(512);"`
-	Thumbnail    string `gorm:"type:varchar(512);"`
-	BookWish     uint32 `gorm:"not null default 0"`
-	BookDo       uint32 `gorm:"not null default 0"`
-	BookCollect  uint32 `gorm:"not null default 0"`
-	GameWish     uint32 `gorm:"not null default 0"`
-	GameDo       uint32 `gorm:"not null default 0"`
-	GameCollect  uint32 `gorm:"not null default 0"`
-	MovieWish    uint32 `gorm:"not null default 0"`
-	MovieDo      uint32 `gorm:"not null default 0"`
-	MovieCollect uint32 `gorm:"not null default 0"`
-	SongWish     uint32 `gorm:"not null default 0"`
-	SongDo       uint32 `gorm:"not null default 0"`
-	SongCollect  uint32 `gorm:"not null default 0"`
-	SyncAt       time.Time
-	CheckAt      time.Time
-	RegisterAt   time.Time
-	PublishAt    time.Time
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	ID           uint64 `gorm:"comment:自增主键 ID"`
+	DoubanUid    uint64 `gorm:"not null;uniqueIndex;comment:豆瓣用户 ID"`
+	Domain       string `gorm:"not null;index;type:varchar(64);comment:豆瓣个人主页域名 (如 ahbei)"`
+	Name         string `gorm:"not null;type:varchar(512);comment:用户昵称"`
+	Thumbnail    string `gorm:"type:varchar(512);comment:用户头像 URL"`
+	BookWish     uint32 `gorm:"not null default 0;comment:想读数量"`
+	BookDo       uint32 `gorm:"not null default 0;comment:在读数量"`
+	BookCollect  uint32 `gorm:"not null default 0;comment:读过数量"`
+	GameWish     uint32 `gorm:"not null default 0;comment:想玩数量"`
+	GameDo       uint32 `gorm:"not null default 0;comment:在玩数量"`
+	GameCollect  uint32 `gorm:"not null default 0;comment:玩过数量"`
+	MovieWish    uint32 `gorm:"not null default 0;comment:想看数量"`
+	MovieDo      uint32 `gorm:"not null default 0;comment:在看数量"`
+	MovieCollect uint32 `gorm:"not null default 0;comment:看过数量"`
+	SongWish     uint32 `gorm:"not null default 0;comment:想听数量"`
+	SongDo       uint32 `gorm:"not null default 0;comment:在听数量"`
+	SongCollect  uint32 `gorm:"not null default 0;comment:听过数量"`
+	SyncAt       time.Time `gorm:"comment:最近同步时间"`
+	CheckAt      time.Time `gorm:"comment:最近检测时间"`
+	RegisterAt   time.Time `gorm:"comment:注册时间 (首次抓取时间)"`
+	PublishAt    time.Time `gorm:"comment:用户最近发布时间 (用于判断是否变化)"`
+	CreatedAt    time.Time `gorm:"comment:记录创建时间"`
+	UpdatedAt    time.Time `gorm:"comment:记录更新时间"`
 }
 
 func (User) TableName() string {

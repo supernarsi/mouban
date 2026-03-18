@@ -5,25 +5,25 @@ import (
 )
 
 type Movie struct {
-	ID          uint64
-	DoubanId    uint64 `gorm:"not null;uniqueIndex"`
-	Title       string `gorm:"not null;type:varchar(512)"`
-	Director    string `gorm:"type:varchar(512)"`
-	Writer      string `gorm:"type:varchar(512)"`
-	Actor       string `gorm:"type:varchar(2048)"`
-	Style       string `gorm:"type:varchar(512)"`
-	Site        string `gorm:"type:varchar(512)"`
-	Country     string `gorm:"type:varchar(512)"`
-	Language    string `gorm:"type:varchar(512)"`
-	PublishDate string `gorm:"type:varchar(512)"`
-	Episode     uint32
-	Duration    uint32
-	Alias       string `gorm:"type:varchar(512)"`
-	IMDb        string `gorm:"type:varchar(512);column:imdb"`
-	Intro       string `gorm:"type:mediumtext"`
-	Thumbnail   string `gorm:"type:varchar(512)"`
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID          uint64 `gorm:"comment:自增主键 ID"`
+	DoubanId    uint64 `gorm:"not null;uniqueIndex;comment:豆瓣电影 ID"`
+	Title       string `gorm:"not null;type:varchar(512);comment:电影名称"`
+	Director    string `gorm:"type:varchar(512);comment:导演"`
+	Writer      string `gorm:"type:varchar(512);comment:编剧"`
+	Actor       string `gorm:"type:varchar(2048);comment:主演 (多人)"`
+	Style       string `gorm:"type:varchar(512);comment:类型/风格"`
+	Site        string `gorm:"type:varchar(512);comment:官方网站"`
+	Country     string `gorm:"type:varchar(512);comment:制片国家/地区"`
+	Language    string `gorm:"type:varchar(512);comment:语言"`
+	PublishDate string `gorm:"type:varchar(512);comment:上映日期"`
+	Episode     uint32 `gorm:"comment:集数 (电视剧)"`
+	Duration    uint32 `gorm:"comment:片长 (分钟)"`
+	Alias       string `gorm:"type:varchar(512);comment:又名"`
+	IMDb        string `gorm:"type:varchar(512);column:imdb;comment:IMDb 链接"`
+	Intro       string `gorm:"type:mediumtext;comment:简介"`
+	Thumbnail   string `gorm:"type:varchar(512);comment:海报 URL"`
+	CreatedAt   time.Time `gorm:"comment:记录创建时间"`
+	UpdatedAt   time.Time `gorm:"comment:记录更新时间"`
 }
 
 func (Movie) TableName() string {

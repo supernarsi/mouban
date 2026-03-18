@@ -101,21 +101,55 @@ func getConnection(username string, password string, host string, port string, d
 }
 
 func migrateTables() {
+	migrator := Db.Migrator()
 
-	err := Db.AutoMigrate(
-		&model.Access{},
-		&model.Book{},
-		&model.Comment{},
-		&model.Game{},
-		&model.Movie{},
-		&model.Song{},
-		&model.Rating{},
-		&model.Schedule{},
-		&model.User{},
-		&model.Storage{},
-	)
-	if err != nil {
-		panic("init database failed " + err.Error())
+	// 表注释定义
+	tableComments := map[string]string{
+		"access":   "访问日志表 - 记录 API 访问日志，用于限流和审计",
+		"book":     "书籍条目信息表 - 存储书籍详细信息",
+		"comment":  "用户评论表 - 存储用户对条目的评论/标注/评分记录",
+		"game":     "游戏条目信息表 - 存储游戏详细信息",
+		"movie":    "电影条目信息表 - 存储电影详细信息",
+		"song":     "音乐专辑信息表 - 存储音乐专辑详细信息",
+		"rating":   "评分统计表 - 存储条目的聚合评分数据",
+		"schedule": "爬虫调度队列表 - 存储待爬取任务队列",
+		"user":     "豆瓣用户信息表 - 存储用户基本信息和各类目数量统计",
+		"storage":  "存储映射表 - 记录原始图片 URL 到 S3 存储的映射关系",
 	}
 
+	// 只在表不存在时创建表，避免覆盖已有表结构
+	tables := []struct {
+		model interface{ TableName() string }
+		name  string
+	}{
+		{&model.Access{}, "access"},
+		{&model.Book{}, "book"},
+		{&model.Comment{}, "comment"},
+		{&model.Game{}, "game"},
+		{&model.Movie{}, "movie"},
+		{&model.Song{}, "song"},
+		{&model.Rating{}, "rating"},
+		{&model.Schedule{}, "schedule"},
+		{&model.User{}, "user"},
+		{&model.Storage{}, "storage"},
+	}
+
+	for _, t := range tables {
+		if !migrator.HasTable(t.model) {
+			// 创建表并设置表注释
+			if err := migrator.CreateTable(t.model); err != nil {
+				panic("create table " + t.name + " failed: " + err.Error())
+			}
+			// 为表添加注释
+			comment, ok := tableComments[t.name]
+			if ok {
+				if err := Db.Exec(fmt.Sprintf("ALTER TABLE %s COMMENT = ?", t.name), comment).Error; err != nil {
+					logrus.Warnln("add comment to table " + t.name + " failed:", err)
+				}
+			}
+			logrus.Infoln("create table " + t.name + " success")
+		} else {
+			logrus.Infoln("table " + t.name + " already exists, skip creation")
+		}
+	}
 }

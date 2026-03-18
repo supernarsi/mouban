@@ -5,19 +5,19 @@ import (
 )
 
 type Game struct {
-	ID          uint64
-	DoubanId    uint64 `gorm:"not null;uniqueIndex"`
-	Title       string `gorm:"not null;type:varchar(512)"`
-	Platform    string `gorm:"type:varchar(512)"`
-	Genre       string `gorm:"type:varchar(512)"`
-	Alias       string `gorm:"type:varchar(512)"`
-	Developer   string `gorm:"type:varchar(512)"`
-	Publisher   string `gorm:"type:varchar(512)"`
-	PublishDate string `gorm:"type:varchar(512)"`
-	Intro       string `gorm:"type:mediumtext"`
-	Thumbnail   string `gorm:"type:varchar(512)"`
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID          uint64 `gorm:"comment:自增主键 ID"`
+	DoubanId    uint64 `gorm:"not null;uniqueIndex;comment:豆瓣游戏 ID"`
+	Title       string `gorm:"not null;type:varchar(512);comment:游戏名称"`
+	Platform    string `gorm:"type:varchar(512);comment:平台 (PC/PS5/Switch 等)"`
+	Genre       string `gorm:"type:varchar(512);comment:类型"`
+	Alias       string `gorm:"type:varchar(512);comment:又名"`
+	Developer   string `gorm:"type:varchar(512);comment:开发商"`
+	Publisher   string `gorm:"type:varchar(512);comment:发行商"`
+	PublishDate string `gorm:"type:varchar(512);comment:发行日期"`
+	Intro       string `gorm:"type:mediumtext;comment:游戏简介"`
+	Thumbnail   string `gorm:"type:varchar(512);comment:封面图 URL"`
+	CreatedAt   time.Time `gorm:"comment:记录创建时间"`
+	UpdatedAt   time.Time `gorm:"comment:记录更新时间"`
 }
 
 func (Game) TableName() string {
